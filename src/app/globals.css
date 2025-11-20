@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020202;
+  --foreground: #00ff41;
+  
+  --cyber-black: #020202;
+  --cyber-dark: #0a0a0a;
+  --cyber-green: #00ff41;
+  --cyber-green-dim: #008f11;
+  --cyber-blue: #00f0ff;
+  --cyber-red: #ff003c;
+  --cyber-gray: #1a1a1a;
+  --cyber-border: #333333;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-cyber-black: var(--cyber-black);
+  --color-cyber-dark: var(--cyber-dark);
+  --color-cyber-green: var(--cyber-green);
+  --color-cyber-green-dim: var(--cyber-green-dim);
+  --color-cyber-blue: var(--cyber-blue);
+  --color-cyber-red: var(--cyber-red);
+  --color-cyber-gray: var(--cyber-gray);
+  --color-cyber-border: var(--cyber-border);
+  
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --animate-scanline: scanline 8s linear infinite;
+  --animate-blink: blink 1s step-end infinite;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-glitch: glitch 1s linear infinite;
+
+  @keyframes scanline {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 0% 100%; }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 5px var(--cyber-green-dim); }
+    50% { box-shadow: 0 0 20px var(--cyber-green-dim); }
+  }
+}
+
+body {
+  background-color: var(--cyber-black);
+  color: var(--cyber-green);
+  font-family: var(--font-mono);
+  overflow-x: hidden;
+}
+
+/* Utilities */
+.text-glow {
+  text-shadow: 0 0 10px var(--cyber-green);
+}
+.text-glow-red {
+  text-shadow: 0 0 10px var(--cyber-red);
+}
+.text-glow-blue {
+  text-shadow: 0 0 10px var(--cyber-blue);
+}
+.border-glow {
+  box-shadow: 0 0 10px var(--cyber-green-dim);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--cyber-black);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--cyber-green-dim);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cyber-green);
+}
