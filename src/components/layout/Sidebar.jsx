@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   Menu,
   X,
+  Smartphone,
+  Camera,
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -20,6 +22,8 @@ const Sidebar = () => {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/logs", label: "Live Logs", icon: Terminal },
     { href: "/threats", label: "Threat Map", icon: ShieldAlert },
+    { href: "/device-monitor", label: "Target Device", icon: Smartphone },
+    { href: "/surveillance", label: "Surveillance", icon: Camera },
     { href: "/login", label: "Access Control", icon: Lock },
   ];
 
