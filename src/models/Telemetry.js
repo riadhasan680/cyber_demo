@@ -38,6 +38,11 @@ const TelemetrySchema = new mongoose.Schema(
           type: Date,
           default: Date.now,
         },
+        isDeleted: {
+          type: Boolean,
+          default: false,
+        },
+        deletedAt: Date,
       },
     ],
   },

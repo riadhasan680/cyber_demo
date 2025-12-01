@@ -33,6 +33,38 @@ export async function POST(req) {
   }
 }
 
+export async function PUT(req) {
+  try {
+    await connectDB();
+    const { deviceId, imageId, action } = await req.json();
+
+    if (!deviceId || !imageId || !action) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const update =
+      action === "delete"
+        ? { "images.$.isDeleted": true, "images.$.deletedAt": new Date() }
+        : { "images.$.isDeleted": false, "images.$.deletedAt": null };
+
+    const result = await Telemetry.updateOne(
+      { deviceId, "images._id": imageId },
+      { $set: update }
+    );
+
+    return NextResponse.json({ success: true, data: result });
+  } catch (error) {
+    console.error("Update Error:", error);
+    return NextResponse.json(
+      { error: "Failed to update telemetry" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET(req) {
   try {
     await connectDB();

